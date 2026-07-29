@@ -1,0 +1,48 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String          @id @default(uuid())
+  email         String          @unique
+  name          String?
+  avatarUrl     String?
+  createdAt     DateTime        @default(now())
+  favorites     SavedTrend[]
+  searchHistory SearchHistory[]
+}
+
+model Trend {
+  id          String       @id
+  title       String
+  summary     String
+  popularity  Int
+  category    String
+  country     String       @default("Global")
+  duration    String
+  lastUpdated DateTime     @default(now())
+  savedBy     SavedTrend[]
+}
+
+model SavedTrend {
+  id        String   @id @default(uuid())
+  userId    String
+  trendId   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trend     Trend    @relation(fields: [trendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, trendId])
+}
+
+model SearchHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  query     String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

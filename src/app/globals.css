@@ -1,0 +1,165 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-space-black: #050816;
+  --color-secondary-navy: #0B1220;
+  --color-electric-blue: #4CC9F0;
+  --color-purple-accent: #7B61FF;
+  --color-neon-cyan: #00E5FF;
+  
+  --font-sans: 'Inter', sans-serif;
+  --font-orbitron: 'Orbitron', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  
+  --animate-scanline: scanline 8s linear infinite;
+  --animate-pulse-slow: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes flicker {
+  0% { opacity: 0.97; }
+  50% { opacity: 1; }
+  100% { opacity: 0.98; }
+}
+
+:root {
+  --background: #050816;
+  --foreground: #4CC9F0;
+  color-scheme: dark;
+}
+
+body {
+  background-color: #050816;
+  color: #e2e8f0;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #050816;
+}
+::-webkit-scrollbar-thumb {
+  background: #0B1220;
+  border: 1px solid #7B61FF;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4CC9F0;
+}
+
+/* Glowing Neon Utility Classes */
+.text-glow-cyan {
+  text-shadow: 0 0 10px rgba(0, 229, 255, 0.6), 0 0 20px rgba(0, 229, 255, 0.2);
+}
+
+.text-glow-purple {
+  text-shadow: 0 0 10px rgba(123, 97, 255, 0.6), 0 0 20px rgba(123, 97, 255, 0.2);
+}
+
+.border-glow-cyan {
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.2), inset 0 0 15px rgba(0, 229, 255, 0.1);
+  border-color: rgba(0, 229, 255, 0.4);
+}
+
+.border-glow-purple {
+  box-shadow: 0 0 15px rgba(123, 97, 255, 0.2), inset 0 0 15px rgba(123, 97, 255, 0.1);
+  border-color: rgba(123, 97, 255, 0.4);
+}
+
+/* scanline overlay */
+.scanlines {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.25) 50%
+  );
+  background-size: 100% 4px;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+/* NASA/Cyber HUD Grid Background */
+.hud-grid {
+  position: fixed;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(76, 201, 240, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(76, 201, 240, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  background-position: center;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hud-grid::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 30%, rgba(5, 8, 22, 0.9) 100%);
+  pointer-events: none;
+}
+
+/* Glassmorphism Panels */
+.glass-panel {
+  background: rgba(11, 18, 32, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.glass-panel-cyan {
+  background: rgba(11, 18, 32, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(76, 201, 240, 0.15);
+}
+
+.glass-panel-purple {
+  background: rgba(11, 18, 32, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(123, 97, 255, 0.15);
+}
+
+/* Warp Speed Effect */
+.warp-container {
+  perspective: 600px;
+}
+.warp-line {
+  position: absolute;
+  background: linear-gradient(to right, transparent, #4CC9F0, white);
+  height: 2px;
+  border-radius: 999px;
+  opacity: 0.8;
+  animation: warp-move 1.2s infinite linear;
+}
+
+@keyframes warp-move {
+  0% {
+    transform: translate3d(0, 0, -600px) rotate(0deg);
+    width: 0px;
+  }
+  100% {
+    transform: translate3d(var(--tx), var(--ty), 600px) rotate(360deg);
+    width: 300px;
+  }
+}
