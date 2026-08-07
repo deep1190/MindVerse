@@ -1,44 +1,81 @@
-ï»¿# MindVerse ğŸŒŒ
+# MindVerse
 
-> **Explore Intelligence. Understand the World.**
+> **Why is it trending? Find out — in seconds.**
 
-MindVerse is an AI-powered knowledge universe where users explore planets representing knowledge domains. The MVP launches **News Planet** â€” a multi-agent system that explains *why* anything is trending.
+MindVerse is an AI-powered trend intelligence tool. Search any person, company, event, meme, or technology, and eight specialized AI agents work in parallel to explain exactly why it's trending right now.
 
-## Features
+---
 
-- ğŸª **3D Space Landing Page** â€” Orbiting planets with starfield particle canvas and warp-drive transitions
-- ğŸ” **Why Is It Trending Engine** â€” 8 specialized AI agents (Discovery, Research, Timeline, Social Pulse, Sentiment, Meme Decoder, Prediction, Summary)
-- ğŸ“Š **Interactive Visualizations** â€” Recharts sentiment donut charts, expandable chronological timelines, live social pulse feeds
-- ğŸ§  **Explanation Modes** â€” ELI10, General Citizen, and Expert Analyst
-- ğŸ”– **Bookmarks & Search History** â€” Persistent via PostgreSQL (Prisma) with local fallback
-- ğŸµ **Programmatic Audio** â€” Sci-Fi sound effects via Web Audio API
+## What It Does
+
+- **Trend Feed** — Curated trending topics across Technology, Business, Sports, Entertainment, Politics, Science, Gaming, India, and Global categories
+- **Search Any Trend** — Ask "Why is X trending?" and get a complete AI-driven breakdown
+- **8-Agent Pipeline** — Discovery ? Research ? Timeline ? Social Pulse ? Sentiment ? Meme Decoder ? Prediction ? Summary
+- **Interactive Timeline** — Day-by-day chronological event sequence you can expand
+- **Sentiment Analysis** — Donut chart showing public reaction polarity across positive, neutral, negative, and mixed
+- **Meme Decoder** — Cultural and internet humor context around the trend
+- **Explanation Modes** — ELI10 (simple), General, and Expert Analyst modes
+- **Bookmarks & History** — Save and revisit trends, search history drawer
+
+---
 
 ## Stack
 
 - **Next.js 16** (App Router, TypeScript)
-- **Tailwind CSS v4**
-- **Framer Motion**
-- **Recharts**
-- **Prisma + PostgreSQL**
+- **Tailwind CSS v4** with custom dark space theme
+- **Framer Motion** — Page transitions and card animations
+- **Recharts** — Sentiment visualization charts
+- **Prisma + PostgreSQL** — Persistent bookmarks/history (with in-memory fallback for zero-config local dev)
+- **Web Audio API** — Programmatic Sci-Fi sound effects
+
+---
 
 ## Local Development
 
-1. Clone the repo
-2. Install dependencies: `npm install`
-3. Copy env template: `cp .env.example .env` and fill in `DATABASE_URL`
-4. Run dev server: `npm run dev`
-5. Open [http://localhost:3000](http://localhost:3000)
+`bash
+# 1. Clone
+git clone https://github.com/deep1190/MindVerse.git
+cd MindVerse
+
+# 2. Install dependencies
+npm install
+
+# 3. Set up environment
+cp .env.example .env
+# (Optional) Add a PostgreSQL DATABASE_URL to .env
+# If left blank, the app uses in-memory storage automatically
+
+# 4. Run dev server
+npm run dev
+`
+
+Open [http://localhost:3000](http://localhost:3000).
+
+---
+
+## Environment Variables
+
+See [.env.example](./.env.example) for all available variables.
+
+| Variable | Required | Description |
+|---|---|---|
+| DATABASE_URL | Optional | PostgreSQL connection string. Falls back to in-memory store if not set. |
+
+---
 
 ## Deployment
 
-Deployed on **Vercel**. Set `DATABASE_URL` in Vercel environment variables pointing to a cloud PostgreSQL instance (Neon recommended).
+Deployed on **Vercel**. Set DATABASE_URL as a Vercel environment variable pointing to a cloud PostgreSQL instance (Neon or Supabase recommended).
 
-## Planets Roadmap
+Build command: 
+pm run build  
+Output: .next (auto-detected by Vercel)
 
-| Planet | Status |
+---
+
+## Routes
+
+| Path | Description |
 |---|---|
-| ğŸŒ News Planet | âœ… MVP Live |
-| ğŸ•µ Detective Planet | ğŸ”œ Coming Soon |
-| ğŸ“š History Planet | ğŸ”œ Coming Soon |
-| ğŸ’¡ Startup Planet | ğŸ”œ Coming Soon |
-| ğŸ§  Psychology Planet | ğŸ”œ Coming Soon |
+| / | Homepage — trending feed + search |
+| /trend/[id] | Full trend analysis page |

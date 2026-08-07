@@ -171,7 +171,7 @@ export default function TrendAnalysisPage() {
   // Related Node Click warp speed loader
   const handleRelatedNodeClick = (nodeId: string) => {
     audio.playWarpSweep();
-    router.push(`/news/trend/${nodeId}`);
+    router.push(`/trend/${nodeId}`);
   };
 
   return (
@@ -195,7 +195,7 @@ export default function TrendAnalysisPage() {
       {/* Header HUD control bar */}
       <header className="relative w-full p-4 border-b border-white/5 bg-secondary-navy/40 backdrop-blur-md flex justify-between items-center z-20 select-none">
         <button
-          onClick={() => { audio.playClickChime(); router.push("/news"); }}
+          onClick={() => { audio.playClickChime(); router.push("/"); }}
           className="flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded hover:border-cyan-400/40 text-xs font-mono text-slate-300 hover:text-white transition"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -203,7 +203,7 @@ export default function TrendAnalysisPage() {
         </button>
 
         <div className="font-mono text-[10px] text-cyan-400/50">
-          ANALYST WORKSTATION: ONLINE // SHIELD STATUS: NORMAL
+          TREND INTELLIGENCE WORKSTATION // SYSTEM ONLINE
         </div>
       </header>
 
@@ -700,7 +700,7 @@ export default function TrendAnalysisPage() {
 
       {/* Footer statistics HUD bar */}
       <footer className="w-full p-4 border-t border-white/5 text-center font-mono text-[10px] text-cyan-400/30">
-        [MINDVERSE CORE GRAPH DECISIONS SYSTEM // ALL RIGHTS RESERVED]
+        MINDVERSE // AI TREND INTELLIGENCE SYSTEM
       </footer>
 
     </div>

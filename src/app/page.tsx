@@ -1,436 +1,531 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { audio } from "@/lib/audio";
-import { Compass, ShieldAlert, Cpu, Layers, Disc, GraduationCap } from "lucide-react";
+import { SEEDED_TRENDS } from "@/lib/agents/orchestrator";
+import { db } from "@/lib/db";
+import {
+  Search,
+  TrendingUp,
+  BookMarked,
+  History,
+  Clock,
+  ExternalLink,
+  ChevronRight,
+  Terminal,
+  Zap,
+  User,
+} from "lucide-react";
 
-interface Planet {
-  id: string;
-  name: string;
-  description: string;
-  status: "Available" | "Coming Soon";
-  progress: number;
-  radiusX: number;
-  radiusY: number;
-  speed: number;
-  color: string;
-  icon: any;
-  angleOffset: number;
-  size: number;
-}
-
-const PLANETS: Planet[] = [
-  {
-    id: "news",
-    name: "🌍 News Planet",
-    description: "Explore WHY events are trending. Multi-agent timeline synthesis & social discourse decoder.",
-    status: "Available",
-    progress: 100,
-    radiusX: 180,
-    radiusY: 100,
-    speed: 0.005,
-    color: "from-cyan-400 to-blue-500 shadow-cyan-400/50",
-    icon: Compass,
-    angleOffset: 0,
-    size: 40,
-  },
-  {
-    id: "detective",
-    name: "🕵 Detective Planet",
-    description: "Investigate claims, factcheck rumors, and map misinformation footprints in real-time.",
-    status: "Coming Soon",
-    progress: 15,
-    radiusX: 260,
-    radiusY: 140,
-    speed: 0.0035,
-    color: "from-red-500 to-orange-600 shadow-red-500/40",
-    icon: ShieldAlert,
-    angleOffset: 1.2,
-    size: 32,
-  },
-  {
-    id: "history",
-    name: "📚 History Planet",
-    description: "AI-generated alternate timelines. Alter past events and simulate parallel world history.",
-    status: "Coming Soon",
-    progress: 5,
-    radiusX: 340,
-    radiusY: 180,
-    speed: 0.002,
-    color: "from-yellow-400 to-amber-500 shadow-yellow-400/40",
-    icon: Layers,
-    angleOffset: 2.4,
-    size: 28,
-  },
-  {
-    id: "startup",
-    name: "💡 Startup Planet",
-    description: "Business incubation agents. Synthesize ideas, model economics, and pitch virtual startups.",
-    status: "Coming Soon",
-    progress: 0,
-    radiusX: 420,
-    radiusY: 220,
-    speed: 0.0012,
-    color: "from-emerald-400 to-teal-500 shadow-emerald-400/40",
-    icon: Cpu,
-    angleOffset: 3.6,
-    size: 24,
-  },
-  {
-    id: "psychology",
-    name: "🧠 Psychology Planet",
-    description: "Cognitive feedback loops. Mapping collective internet comments to digital personality matrices.",
-    status: "Coming Soon",
-    progress: 0,
-    radiusX: 500,
-    radiusY: 260,
-    speed: 0.0008,
-    color: "from-purple-500 to-fuchsia-600 shadow-purple-500/40",
-    icon: GraduationCap,
-    angleOffset: 4.8,
-    size: 20,
-  }
-];
-
-export default function LandingPage() {
+export default function HomePage() {
   const router = useRouter();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [hoveredPlanet, setHoveredPlanet] = useState<Planet | null>(null);
-  const [focusedPlanet, setFocusedPlanet] = useState<Planet | null>(null);
-  const [isWarping, setIsWarping] = useState(false);
-  const [restrictedAlert, setRestrictedAlert] = useState<string | null>(null);
-  
-  // Animation coordinates
-  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
-  const angleRef = useRef<Record<string, number>>(
-    PLANETS.reduce((acc, p) => ({ ...acc, [p.id]: p.angleOffset }), {})
-  );
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [userRole, setUserRole] = useState<"Explorer" | "Analyst" | "Admin">("Explorer");
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const [agentPipelineActive, setAgentPipelineActive] = useState(false);
+  const [agentLogs, setAgentLogs] = useState<string[]>([]);
+  const [currentAgentIndex, setCurrentAgentIndex] = useState(0);
+  const [pipelineProgress, setPipelineProgress] = useState(0);
+  const terminalEndRef = useRef<HTMLDivElement>(null);
+
+  const trendsList = Object.values(SEEDED_TRENDS);
+  const categories = ["All", "Technology", "Business", "Sports", "Entertainment", "Politics", "Science", "Gaming", "India", "Global"];
 
   useEffect(() => {
-    // 1. Particle Starfield Canvas Setup
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let animationId: number;
-    let width = (canvas.width = window.innerWidth);
-    let height = (canvas.height = window.innerHeight);
-
-    const handleResize = () => {
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
+    const loadState = async () => {
+      const favs = await db.getFavorites();
+      setFavorites(favs);
+      const history = await db.getSearchHistory();
+      setSearchHistory(history);
     };
-    window.addEventListener("resize", handleResize);
+    loadState();
+  }, []);
 
-    const starCount = 300;
-    const stars = Array.from({ length: starCount }, () => ({
-      x: Math.random() * width - width / 2,
-      y: Math.random() * height - height / 2,
-      z: Math.random() * width,
-      size: Math.random() * 1.5 + 0.5,
-    }));
+  const filteredTrends = trendsList.filter((t) => {
+    if (selectedCategory === "All") return true;
+    if (selectedCategory === "India") return t.country === "India";
+    if (selectedCategory === "Global") return t.country === "Global";
+    return t.category.toLowerCase() === selectedCategory.toLowerCase();
+  });
 
-    // Orbit Animation Loop
-    const tick = () => {
-      // Clear canvas with deep space translucent fade
-      ctx.fillStyle = isWarping ? "rgba(5, 8, 22, 0.25)" : "rgba(5, 8, 22, 0.9)";
-      ctx.fillRect(0, 0, width, height);
+  const handleSearchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
 
-      // Draw standard coordinate system translation to center
-      ctx.save();
-      ctx.translate(width / 2, height / 2);
+    audio.playClickChime();
+    await db.addSearchQuery(searchQuery);
+    const updatedHistory = await db.getSearchHistory();
+    setSearchHistory(updatedHistory);
 
-      // Render starfield (3D travel effect)
-      stars.forEach(star => {
-        let starSpeed = isWarping ? 35 : 0.2;
-        star.z -= starSpeed;
-        
-        // Wrap around if stars fly past camera
-        if (star.z <= 0) {
-          star.z = width;
-          star.x = Math.random() * width - width / 2;
-          star.y = Math.random() * height - height / 2;
-        }
+    setAgentLogs([]);
+    setCurrentAgentIndex(0);
+    setPipelineProgress(0);
+    setAgentPipelineActive(true);
+  };
 
-        // Project 3D points to 2D canvas
-        const k = 400 / star.z;
-        const px = star.x * k;
-        const py = star.y * k;
+  const AGENT_MESSAGES = [
+    { name: "Trend Discovery Agent", msg: "Scanning news APIs, Google Trends, and social volume thresholds..." },
+    { name: "Trend Discovery Agent", msg: "Identified query signal. Initializing full semantic analysis pipeline." },
+    { name: "Research Agent", msg: "Querying news databases, Wikipedia abstracts, and blog summaries..." },
+    { name: "Research Agent", msg: "Retrieved 1,200 unique articles. Cleaning duplicates and extracting entities." },
+    { name: "Timeline Agent", msg: "Re-sequencing timeline structures. Isolating core day-by-day actions." },
+    { name: "Social Pulse Agent", msg: "Scraping social comments (Reddit, YouTube, Twitter API streams)..." },
+    { name: "Social Pulse Agent", msg: "Aggregated 15,200 conversational rows. Parsing semantic context." },
+    { name: "Sentiment Agent", msg: "Calculating polarity indexes. Processing Positive / Negative token structures." },
+    { name: "Meme Decoder Agent", msg: "Locating structural internet jokes, templates, and inside humor connections..." },
+    { name: "Prediction Agent", msg: "Applying forecasting math models. Longevity & Velocity calculation complete." },
+    { name: "Summary Agent", msg: "Synthesizing multi-level outputs (30s, 2m, ELI10, Expert detail panels)..." },
+    { name: "Orchestrator Core", msg: "All agent states: RESOLVED. Loading trend analysis..." },
+  ];
 
-        if (px > -width / 2 && px < width / 2 && py > -height / 2 && py < height / 2) {
-          ctx.beginPath();
-          if (isWarping) {
-            // Draw speed streaks
-            ctx.strokeStyle = `rgba(76, 201, 240, ${Math.min(1, (1 - star.z / width) * 1.5)})`;
-            ctx.lineWidth = star.size * 1.5;
-            ctx.moveTo(px, py);
-            // Streaks go outwards from center
-            ctx.lineTo(px - (px * 0.15), py - (py * 0.15));
-            ctx.stroke();
-          } else {
-            // Standard twinkling points
-            const opacity = Math.min(1, (1 - star.z / width) * 1.2);
-            ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
-            ctx.arc(px, py, star.size, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-      });
-
-      // Render orbiting planet paths on layout matrix
-      if (!isWarping) {
-        ctx.strokeStyle = "rgba(76, 201, 240, 0.05)";
-        ctx.lineWidth = 1;
-        PLANETS.forEach(p => {
-          ctx.beginPath();
-          ctx.ellipse(0, 0, p.radiusX, p.radiusY, 0, 0, Math.PI * 2);
-          ctx.stroke();
-        });
+  useEffect(() => {
+    if (!agentPipelineActive) return;
+    let logCounter = 0;
+    const interval = setInterval(() => {
+      if (logCounter < AGENT_MESSAGES.length) {
+        const item = AGENT_MESSAGES[logCounter];
+        setAgentLogs((prev) => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] [${item.name}] || ${item.msg}`,
+        ]);
+        logCounter++;
+        setCurrentAgentIndex(logCounter);
+        setPipelineProgress(Math.floor((logCounter / AGENT_MESSAGES.length) * 100));
+        audio.playHoverChime();
+      } else {
+        clearInterval(interval);
+        setTimeout(() => {
+          setAgentPipelineActive(false);
+          const trendId = searchQuery.replace(/\s+/g, "-").toLowerCase();
+          router.push(`/trend/${trendId}`);
+          setSearchQuery("");
+        }, 800);
       }
+    }, 420);
+    return () => clearInterval(interval);
+  }, [agentPipelineActive, searchQuery]);
 
-      ctx.restore();
+  useEffect(() => {
+    if (terminalEndRef.current) {
+      terminalEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [agentLogs]);
 
-      // 2. Calculations for DOM Planet elements overlay
-      const newPositions: Record<string, { x: number; y: number }> = {};
-      PLANETS.forEach(p => {
-        // Increment angle
-        angleRef.current[p.id] += p.speed;
-        const currentAngle = angleRef.current[p.id];
-        
-        // Calculate coords (ellipse centered on screen)
-        const x = width / 2 + Math.cos(currentAngle) * p.radiusX;
-        const y = height / 2 + Math.sin(currentAngle) * p.radiusY;
-        
-        newPositions[p.id] = { x, y };
-      });
-      setPositions(newPositions);
-
-      animationId = requestAnimationFrame(tick);
-    };
-
-    tick();
-
-    return () => {
-      cancelAnimationFrame(animationId);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [isWarping]);
-
-  const handlePlanetClick = (p: Planet) => {
-    if (isWarping) return;
-
-    if (p.id === "news") {
-      audio.playWarpSweep();
-      setIsWarping(true);
-      setFocusedPlanet(p);
-
-      // Delay to complete warp animation, then redirect
-      setTimeout(() => {
-        router.push("/news");
-      }, 1300);
+  const handleFavoriteToggle = async (trendId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    audio.playClickChime();
+    const isFav = favorites.includes(trendId);
+    if (isFav) {
+      await db.removeFavorite(trendId);
+      setFavorites((prev) => prev.filter((id) => id !== trendId));
     } else {
-      audio.playAccessDenied();
-      setRestrictedAlert(p.name);
-      setTimeout(() => {
-        setRestrictedAlert(null);
-      }, 3000);
+      await db.addFavorite(trendId);
+      setFavorites((prev) => [...prev, trendId]);
     }
   };
 
   return (
-    <div className="relative min-h-screen flex flex-col justify-between overflow-hidden bg-[#050816] select-none font-sans">
-      
-      {/* 3D background starry universe */}
-      <canvas ref={canvasRef} className="absolute inset-0 z-0 block" />
-
-      {/* Orbit System Header overlay */}
-      <header className="relative z-10 w-full p-6 flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl tracking-widest font-extrabold text-glow-cyan font-orbitron bg-gradient-to-r from-cyan-400 to-indigo-500 bg-clip-text text-transparent">
-            MINDVERSE
-          </h1>
-          <p className="text-xs text-cyan-400/60 font-mono mt-1">SECTOR: 0P-1 // AI GALAXY GRID</p>
+    <div className="relative flex flex-col min-h-screen bg-[#050816] overflow-x-hidden font-sans">
+      {/* Header */}
+      <header className="relative w-full px-4 py-3 border-b border-white/5 bg-[#0B1220]/60 backdrop-blur-md flex justify-between items-center z-20">
+        <div className="flex items-center gap-3">
+          <div>
+            <span className="text-xl font-extrabold font-orbitron tracking-wider bg-gradient-to-r from-cyan-400 to-indigo-500 bg-clip-text text-transparent">
+              MINDVERSE
+            </span>
+            <span className="ml-2 text-[10px] font-mono text-cyan-400/40 hidden sm:inline">
+              // WHY IS IT TRENDING?
+            </span>
+          </div>
         </div>
-        
-        <div className="text-right font-mono text-[10px] text-indigo-400/80 leading-relaxed bg-[#0B1220]/60 border border-white/5 p-2 rounded backdrop-blur-sm">
-          <div>COORD_X: 44.92 / COORD_Y: 10.98</div>
-          <div>SIMULATORS: 5 ACTIVE</div>
-          <div className="text-emerald-400 flex items-center justify-end gap-1 mt-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            STATION ONLINE
+
+        <div className="flex items-center gap-3 font-mono text-xs text-cyan-400/80">
+          <button
+            onClick={() => { audio.playClickChime(); setIsHistoryOpen(true); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 hover:text-white transition"
+          >
+            <History className="w-4 h-4 text-purple-400" />
+            <span className="hidden sm:inline">CONSOLE</span>
+          </button>
+
+          <div className="relative">
+            <button
+              onClick={() => { audio.playClickChime(); setIsProfileOpen(!isProfileOpen); }}
+              className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded hover:border-cyan-400/40 transition"
+            >
+              <User className="w-4 h-4 text-cyan-400" />
+              <span>{userRole.toUpperCase()}</span>
+            </button>
+            {isProfileOpen && (
+              <div className="absolute right-0 mt-2 w-44 bg-[#0B1220] border border-cyan-500/20 rounded shadow-2xl z-50 p-1">
+                {(["Explorer", "Analyst", "Admin"] as const).map((role) => (
+                  <button
+                    key={role}
+                    onClick={() => { audio.playClickChime(); setUserRole(role); setIsProfileOpen(false); }}
+                    className={`w-full text-left px-3 py-1.5 hover:bg-cyan-900/30 rounded text-xs transition ${userRole === role ? "text-cyan-400 font-bold" : "text-slate-400"}`}
+                  >
+                    {role} Mode
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Main Galaxy System Container */}
-      <div className="flex-1 w-full relative flex items-center justify-center">
-        
-        {/* Core Intelligence Nebula Center */}
-        {!isWarping && (
-          <div className="absolute w-24 h-24 rounded-full bg-gradient-to-br from-indigo-600/30 to-purple-600/30 blur-2xl flex items-center justify-center animate-pulse-slow">
-            <div className="w-12 h-12 rounded-full border border-indigo-500/20 bg-indigo-950/40 flex items-center justify-center">
-              <Disc className="w-6 h-6 text-indigo-400/40 animate-spin" />
+      {/* Main */}
+      <main className="flex-1 w-full max-w-6xl mx-auto p-4 sm:p-6 flex flex-col gap-6 relative z-10 select-text">
+
+        {/* Search hero */}
+        <div className="glass-panel border-glow-cyan p-6 sm:p-8 rounded-lg mt-2 flex flex-col items-center text-center relative overflow-hidden">
+          <div className="absolute -top-24 -left-20 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-20 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <h1 className="text-2xl sm:text-3xl font-extrabold font-orbitron text-white tracking-wide">
+            🔎 WHY IS IT TRENDING?
+          </h1>
+          <p className="text-xs text-slate-400 max-w-lg mt-2 leading-relaxed">
+            Enter a person, company, event, meme, or technology. Our 8 specialized AI agents investigate, sequence, decode, and summarize it — from timeline to sentiment to meme culture.
+          </p>
+
+          <form onSubmit={handleSearchSubmit} className="w-full max-w-2xl mt-5 flex flex-col sm:flex-row gap-2">
+            <div className="flex-1 relative">
+              <input
+                id="trend-search-input"
+                type="text"
+                placeholder='e.g. "Why is OpenAI trending?" or "Why is Coldplay trending?"'
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#050816]/80 text-white placeholder-slate-500 text-sm pl-4 pr-10 py-3 rounded border border-white/10 hover:border-cyan-400/40 focus:border-cyan-400 focus:outline-none transition font-sans"
+              />
+              <Search className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2" />
             </div>
-          </div>
-        )}
+            <button
+              id="run-agents-btn"
+              type="submit"
+              className="px-6 py-3 bg-gradient-to-r from-cyan-400 to-indigo-500 text-white font-bold text-sm tracking-wide rounded hover:from-cyan-300 hover:to-indigo-400 shadow-md shadow-cyan-400/20 active:scale-95 transition whitespace-nowrap"
+            >
+              RUN AGENTS
+            </button>
+          </form>
 
-        {/* Orbiting Planets elements overlay */}
-        <AnimatePresence>
-          {!isWarping &&
-            PLANETS.map(p => {
-              const pos = positions[p.id];
-              if (!pos) return null;
-
-              const isAvailable = p.status === "Available";
-
-              return (
-                <div
-                  key={p.id}
-                  style={{
-                    left: `${pos.x}px`,
-                    top: `${pos.y}px`,
-                    transform: "translate(-50%, -50%)",
-                  }}
-                  className="absolute z-10 cursor-pointer group"
-                  onMouseEnter={() => {
-                    setHoveredPlanet(p);
-                    audio.playHoverChime();
-                  }}
-                  onMouseLeave={() => setHoveredPlanet(null)}
-                  onClick={() => handlePlanetClick(p)}
-                >
-                  {/* Planet Sphere Ring Border */}
-                  <div className="relative flex items-center justify-center">
-                    
-                    {/* Glowing orbit halo */}
-                    <div
-                      className={`absolute rounded-full transition-all duration-300 ${
-                        hoveredPlanet?.id === p.id 
-                          ? "w-16 h-16 scale-110 opacity-70"
-                          : "w-10 h-10 opacity-30"
-                      } bg-gradient-to-r ${p.color} blur-md`}
-                    />
-
-                    {/* Actual Planet Sphere */}
-                    <div
-                      style={{ width: `${p.size + 8}px`, height: `${p.size + 8}px` }}
-                      className={`relative rounded-full bg-gradient-to-br ${p.color} flex items-center justify-center text-white border border-white/20 transition-transform duration-300 group-hover:scale-110 shadow-lg`}
-                    >
-                      <p.icon className="w-1/2 h-1/2" />
-                      
-                      {/* Interactive ring for News Planet */}
-                      {isAvailable && (
-                        <div className="absolute inset-0 rounded-full border border-cyan-300/40 scale-125 animate-ping opacity-60" />
-                      )}
-                    </div>
-
-                    {/* Miniature Holographic tag */}
-                    <div className="absolute top-[120%] text-[10px] font-orbitron font-semibold text-cyan-300 whitespace-nowrap bg-space-black/70 px-2 py-0.5 border border-white/5 rounded backdrop-blur">
-                      {p.name.split(" ")[1]}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-        </AnimatePresence>
-
-        {/* Warp Drive Speed tunnel visual */}
-        {isWarping && (
-          <div className="text-center z-10 px-4">
-            <h2 className="text-5xl font-extrabold tracking-widest text-glow-cyan font-orbitron animate-pulse text-cyan-300">
-              WARPING TO NEWS PLANET
-            </h2>
-            <p className="text-sm font-mono text-cyan-400 mt-4 tracking-widest animate-pulse duration-75">
-              ESTABLISHING SYNERGY INGESTION MATRIX [8 AGENTS CONNECTING]...
-            </p>
-          </div>
-        )}
-
-        {/* Floating Holographic Planet Panel Information */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 w-80 sm:w-[480px]">
-          <AnimatePresence mode="wait">
-            {hoveredPlanet ? (
-              <motion.div
-                key={hoveredPlanet.id}
-                initial={{ opacity: 0, y: 30, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                transition={{ duration: 0.2 }}
-                className="glass-panel border-glow-cyan p-5 rounded-lg flex flex-col gap-3"
+          <div className="flex flex-wrap gap-2 justify-center mt-3.5">
+            <span className="text-[10px] uppercase font-mono text-cyan-400/40 py-1">Quick search:</span>
+            {["OpenAI", "Coldplay", "NVIDIA", "Labubu", "Wimbledon"].map((h) => (
+              <button
+                key={h}
+                onClick={() => { setSearchQuery(`Why is ${h} trending?`); audio.playHoverChime(); }}
+                className="text-[10px] font-mono bg-white/5 px-2 py-0.5 border border-white/5 rounded text-indigo-300 hover:text-cyan-300 hover:border-cyan-500/20 transition"
               >
-                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                  <h3 className="text-lg font-bold font-orbitron text-cyan-300 flex items-center gap-2">
-                    <hoveredPlanet.icon className="w-5 h-5" />
-                    {hoveredPlanet.name}
-                  </h3>
-                  <span
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                      hoveredPlanet.status === "Available"
-                        ? "bg-cyan-950/40 border-cyan-400/40 text-cyan-400"
-                        : "bg-purple-950/40 border-purple-400/40 text-purple-400"
-                    }`}
-                  >
-                    {hoveredPlanet.status}
-                  </span>
-                </div>
-                
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  {hoveredPlanet.description}
-                </p>
-
-                {/* Progress bar info */}
-                <div className="grid grid-cols-[1fr_80px] items-center gap-3 mt-1">
-                  <div className="w-full bg-[#050816] rounded-full h-1.5 overflow-hidden border border-white/5">
-                    <div
-                      style={{ width: `${hoveredPlanet.progress}%` }}
-                      className="bg-gradient-to-r from-cyan-400 to-indigo-500 h-full rounded-full"
-                    />
-                  </div>
-                  <span className="text-[10px] font-mono text-cyan-400/80 text-right">
-                    LAUNCH: {hoveredPlanet.progress}%
-                  </span>
-                </div>
-              </motion.div>
-            ) : (
-              !isWarping && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-center font-mono text-[11px] text-cyan-400/50"
-                >
-                  [HOVER OVER A PLANET TO COMPASS DATA // CLICK TO ZOOMS CAMERA]
-                </motion.div>
-              )
-            )}
-          </AnimatePresence>
+                {h}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Access Denied Warning Toast alert */}
-        <AnimatePresence>
-          {restrictedAlert && (
+        {/* Trending grid + Daily Digest */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 flex flex-col gap-4">
+
+            <div className="flex items-center justify-between border-b border-white/5 pb-2 mt-2">
+              <h2 className="text-sm font-bold font-orbitron tracking-wider text-cyan-300 flex items-center gap-1.5">
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                TRENDING NOW
+              </h2>
+              <span className="text-[11px] font-mono text-cyan-400/50">
+                {filteredTrends.length} TOPICS
+              </span>
+            </div>
+
+            {/* Category filters */}
+            <div className="flex flex-wrap gap-2">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => { audio.playClickChime(); setSelectedCategory(cat); }}
+                  className={`px-3 py-1 rounded text-xs font-semibold border transition ${
+                    selectedCategory === cat
+                      ? "bg-cyan-500/10 border-cyan-400 text-cyan-400 shadow-[0_0_10px_rgba(76,201,240,0.15)]"
+                      : "bg-[#0B1220]/20 border-white/5 text-slate-400 hover:text-slate-200 hover:border-white/10"
+                  }`}
+                >
+                  {cat.toUpperCase()}
+                </button>
+              ))}
+            </div>
+
+            {/* Trend cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
+              <AnimatePresence mode="popLayout">
+                {filteredTrends.map((t) => {
+                  const isSaved = favorites.includes(t.id);
+                  return (
+                    <motion.div
+                      key={t.id}
+                      layout
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      onClick={() => { audio.playWarpSweep(); router.push(`/trend/${t.id}`); }}
+                      className="glass-panel border-glow-cyan bg-secondary-navy/20 p-5 rounded-lg border border-white/5 hover:border-cyan-500/30 hover:bg-secondary-navy/40 transition duration-300 cursor-pointer group flex flex-col justify-between gap-4 select-none"
+                    >
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <span className="text-[10px] font-mono text-cyan-400/80 bg-cyan-950/40 px-2 py-0.5 border border-cyan-500/20 rounded">
+                            {t.category.toUpperCase()}
+                          </span>
+                          <button
+                            onClick={(e) => handleFavoriteToggle(t.id, e)}
+                            className="text-slate-500 hover:text-purple-400 p-1 rounded-full transition"
+                          >
+                            <BookMarked className={`w-4 h-4 ${isSaved ? "text-purple-400 fill-purple-400" : ""}`} />
+                          </button>
+                        </div>
+                        <h3 className="text-base font-bold text-white group-hover:text-cyan-300 transition font-orbitron mt-2.5">
+                          {t.title}
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-2.5 line-clamp-3 leading-relaxed">
+                          {t.summary["30s"]}
+                        </p>
+                      </div>
+                      <div className="border-t border-white/5 pt-3 flex justify-between items-center text-[10px] font-mono text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                          <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>SCORE: <strong className="text-cyan-400 font-bold">{t.popularity}</strong></span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-slate-500" />
+                          <span>{t.duration}</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* Daily Digest sidebar */}
+          <div className="flex flex-col gap-4">
+            <div className="border-b border-white/5 pb-2 mt-2">
+              <h2 className="text-sm font-bold font-orbitron tracking-wider text-purple-400 flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-purple-400 animate-pulse" />
+                DAILY DIGEST
+              </h2>
+            </div>
+
+            <div className="glass-panel-purple border-glow-purple p-5 rounded-lg flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                <span className="text-[10px] font-mono text-purple-300">AI AGENTS: ACTIVE</span>
+                <span className="text-[9px] font-mono text-purple-400/80">TODAY</span>
+              </div>
+
+              <div className="text-xs text-slate-300 leading-relaxed font-sans">
+                <p className="font-semibold text-white">🔥 Top stories right now:</p>
+                <div className="space-y-2.5 mt-2">
+                  {[
+                    { bold: "API server rushes", text: "Coldplay ticket sellout forces regulatory scans in India." },
+                    { bold: "Hardware conquest", text: "NVIDIA peaks in global market cap on Blackwell demand." },
+                    { bold: "Reasoning models", text: "OpenAI launches GPT-5.5, redefining autonomous AI agents." },
+                  ].map((item, i) => (
+                    <div key={i} className="flex gap-2">
+                      <ChevronRight className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                      <span><strong>{item.bold}</strong>: {item.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-[#050816]/70 border border-white/5 p-3 rounded font-mono text-[10px] text-slate-400 leading-relaxed">
+                <div className="text-cyan-400 tracking-wider mb-1.5">SYSTEM METRICS:</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>VELOCITY: <span className="text-emerald-400 font-bold">+890%</span></div>
+                  <div>AGENTS: <span className="text-white font-bold">8 ONLINE</span></div>
+                  <div>UPTIME: <span className="text-cyan-300 font-bold">99.98%</span></div>
+                  <div>SOURCES: <span className="text-white font-bold">MUM/SF/LON</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="glass-panel p-4 rounded-lg flex flex-col gap-2 border border-white/5 text-xs text-slate-400 leading-relaxed">
+              <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold">HOW IT WORKS</span>
+              <p>Search any trend. Eight specialized AI agents run in parallel — discovering, researching, sequencing timelines, analyzing social sentiment, decoding memes, and predicting longevity — then synthesize it all into clear explanations.</p>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Console Drawer (bookmarks + history) */}
+      <AnimatePresence>
+        {isHistoryOpen && (
+          <>
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: -50 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              className="absolute top-10 inset-x-0 mx-auto w-max z-50 glass-panel border border-red-500 bg-red-950/30 text-red-300 px-4 py-2 rounded shadow-2xl flex items-center gap-2 font-mono text-xs text-glow-red"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsHistoryOpen(false)}
+              className="fixed inset-0 bg-[#050816] z-40 cursor-pointer"
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed right-0 top-0 h-full w-80 sm:w-96 bg-[#0B1220] border-l border-cyan-500/20 z-50 p-5 flex flex-col justify-between shadow-2xl"
             >
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
-              RESTRICTED SECTOR ERROR: Access to {restrictedAlert} requires Level-4 Administrator Clearance.
+              <div className="flex flex-col gap-5 overflow-y-auto flex-1">
+                <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                  <h4 className="font-orbitron font-bold text-white text-sm flex items-center gap-1.5">
+                    <Terminal className="w-4 h-4 text-cyan-400" />
+                    CONSOLE DATA
+                  </h4>
+                  <button onClick={() => setIsHistoryOpen(false)} className="text-slate-400 hover:text-white font-mono text-xs">
+                    [ESC]
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-2.5">
+                  <span className="text-[10px] font-mono text-purple-400 uppercase tracking-widest font-bold">
+                    SAVED BOOKMARKS ({favorites.length})
+                  </span>
+                  {favorites.length === 0 ? (
+                    <div className="text-[11px] font-mono text-slate-500 border border-dashed border-white/5 p-3 rounded text-center">[NO SAVED TRENDS]</div>
+                  ) : (
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                      {favorites.map((id) => {
+                        const trend = trendsList.find((t) => t.id === id);
+                        return (
+                          <div
+                            key={id}
+                            onClick={() => { audio.playWarpSweep(); router.push(`/trend/${id}`); setIsHistoryOpen(false); }}
+                            className="font-mono text-[11px] bg-slate-950/40 hover:bg-cyan-950/30 border border-white/5 p-2 rounded cursor-pointer flex justify-between items-center group transition"
+                          >
+                            <span className="text-slate-300 font-bold group-hover:text-cyan-400 max-w-[80%] truncate">
+                              {trend ? trend.title : id}
+                            </span>
+                            <ExternalLink className="w-3 h-3 text-slate-500 group-hover:text-cyan-400 shrink-0" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2.5">
+                  <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-widest font-bold">
+                    SEARCH HISTORY
+                  </span>
+                  {searchHistory.length === 0 ? (
+                    <div className="text-[11px] font-mono text-slate-500 border border-dashed border-white/5 p-3 rounded text-center">[NO SEARCH HISTORY]</div>
+                  ) : (
+                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                      {searchHistory.map((query, index) => (
+                        <div
+                          key={index}
+                          onClick={() => { setSearchQuery(query); setIsHistoryOpen(false); audio.playHoverChime(); }}
+                          className="font-mono text-[11px] hover:bg-cyan-950/10 border border-white/5 p-2 rounded cursor-pointer flex items-center gap-2 group transition text-slate-400 hover:text-slate-300"
+                        >
+                          <Clock className="w-3 h-3 text-slate-500 group-hover:text-cyan-400" />
+                          <span className="truncate">{query}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t border-white/10 pt-4 font-mono text-[10px] text-cyan-400/40">
+                MODE: {userRole.toUpperCase()} // MINDVERSE AI SYSTEM
+              </div>
             </motion.div>
-          )}
-        </AnimatePresence>
+          </>
+        )}
+      </AnimatePresence>
 
-      </div>
+      {/* Agent Pipeline Fullscreen Overlay */}
+      <AnimatePresence>
+        {agentPipelineActive && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-[#050816]/98 z-50 p-4 sm:p-8 flex flex-col justify-between select-none"
+          >
+            <div className="flex justify-between items-center border-b border-cyan-400/20 pb-4">
+              <div>
+                <h3 className="text-lg font-bold font-orbitron tracking-widest text-cyan-300 animate-pulse flex items-center gap-2">
+                  <Terminal className="w-5 h-5" />
+                  AI AGENTS RUNNING
+                </h3>
+                <p className="text-[10px] font-mono text-slate-400 mt-1">
+                  QUERY: &quot;{searchQuery}&quot; // PROCESSING...
+                </p>
+              </div>
+              <div className="text-right font-mono text-xs text-cyan-400">
+                {pipelineProgress}%
+              </div>
+            </div>
 
-      {/* Footer System Console */}
-      <footer className="relative z-10 w-full p-4 flex flex-col sm:flex-row justify-between items-center border-t border-cyan-400/5 bg-[#050816]/80 text-[10px] font-mono text-cyan-400/40">
-        <div>ORBITAL ANGLE: RESOLVED (60fps)</div>
-        <div className="mt-2 sm:mt-0">[MINDVERSE MVP V1 - DEVELOPED BY DEEPMIND TEAM]</div>
+            <div className="flex-1 my-6 overflow-y-auto bg-slate-950/80 border border-cyan-500/10 rounded-lg p-4 font-mono text-xs text-slate-300 space-y-2 flex flex-col">
+              {agentLogs.length === 0 ? (
+                <div className="text-cyan-400/60 animate-pulse">[ESTABLISHING INFERENCE CHANNELS...]</div>
+              ) : (
+                agentLogs.map((log, idx) => (
+                  <div
+                    key={idx}
+                    className={idx === agentLogs.length - 1 ? "text-cyan-400 font-bold" : "text-[#a5f3fc]"}
+                  >
+                    {log}
+                  </div>
+                ))
+              )}
+              <div ref={terminalEndRef} />
+            </div>
+
+            <div className="border-t border-cyan-400/20 pt-4 flex flex-col gap-4">
+              <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                {["Discovery", "Research", "Timeline", "Social", "Sentiment", "Meme", "Prediction", "Summary"].map((name, idx) => {
+                  const isActive = idx === Math.min(Math.floor(currentAgentIndex / 1.5), 7);
+                  const isDone = Math.min(Math.floor(currentAgentIndex / 1.5), 7) > idx;
+                  return (
+                    <div
+                      key={name}
+                      className={`text-center py-2 px-1 border font-mono text-[9px] rounded transition-all duration-300 ${
+                        isActive
+                          ? "border-cyan-400 bg-cyan-950/20 text-cyan-300 animate-pulse"
+                          : isDone
+                          ? "border-indigo-500/40 bg-indigo-950/10 text-slate-500"
+                          : "border-white/5 text-slate-600"
+                      }`}
+                    >
+                      <div>A.{idx + 1}</div>
+                      <div className="truncate mt-1 font-bold">{name.toUpperCase()}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="w-full bg-[#050816] rounded-full h-2 overflow-hidden border border-white/5">
+                <div
+                  style={{ width: `${pipelineProgress}%` }}
+                  className="bg-gradient-to-r from-cyan-400 via-purple-500 to-indigo-500 h-full rounded-full transition-all duration-300"
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <footer className="w-full p-4 border-t border-white/5 text-center font-mono text-[10px] text-cyan-400/30">
+        MINDVERSE // AI TREND INTELLIGENCE SYSTEM
       </footer>
-
     </div>
   );
 }
