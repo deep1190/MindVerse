@@ -5,7 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { audio } from "@/lib/audio";
 import { getTrend, searchTrend, TrendDetails, RelatedTopicNode } from "@/lib/agents/orchestrator";
-import { db } from "@/lib/db";
+import { 
+  checkFavoriteAction,
+  addFavoriteAction,
+  removeFavoriteAction,
+} from "@/app/actions";
 import { 
   PieChart, 
   Pie, 
@@ -70,7 +74,7 @@ export default function TrendAnalysisPage() {
       setDetails(data);
       
       // Load favorite status
-      const favFlag = await db.checkFavorite(data.id);
+      const favFlag = await checkFavoriteAction(data.id);
       setIsSaved(favFlag);
       
       // Load initial social comments
@@ -152,9 +156,9 @@ export default function TrendAnalysisPage() {
     const nextSaved = !isSaved;
     setIsSaved(nextSaved);
     if (nextSaved) {
-      await db.addFavorite(details.id);
+      await addFavoriteAction(details.id);
     } else {
-      await db.removeFavorite(details.id);
+      await removeFavoriteAction(details.id);
     }
   };
 

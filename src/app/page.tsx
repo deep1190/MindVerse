@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { audio } from "@/lib/audio";
 import { SEEDED_TRENDS } from "@/lib/agents/orchestrator";
-import { db } from "@/lib/db";
+import {
+  getFavoritesAction,
+  addFavoriteAction,
+  removeFavoriteAction,
+  getSearchHistoryAction,
+  addSearchQueryAction,
+} from "@/app/actions";
 import {
   Search,
   TrendingUp,
@@ -41,9 +47,9 @@ export default function HomePage() {
 
   useEffect(() => {
     const loadState = async () => {
-      const favs = await db.getFavorites();
+      const favs = await getFavoritesAction();
       setFavorites(favs);
-      const history = await db.getSearchHistory();
+      const history = await getSearchHistoryAction();
       setSearchHistory(history);
     };
     loadState();
@@ -61,8 +67,8 @@ export default function HomePage() {
     if (!searchQuery.trim()) return;
 
     audio.playClickChime();
-    await db.addSearchQuery(searchQuery);
-    const updatedHistory = await db.getSearchHistory();
+    await addSearchQueryAction(searchQuery);
+    const updatedHistory = await getSearchHistoryAction();
     setSearchHistory(updatedHistory);
 
     setAgentLogs([]);
@@ -124,10 +130,10 @@ export default function HomePage() {
     audio.playClickChime();
     const isFav = favorites.includes(trendId);
     if (isFav) {
-      await db.removeFavorite(trendId);
+      await removeFavoriteAction(trendId);
       setFavorites((prev) => prev.filter((id) => id !== trendId));
     } else {
-      await db.addFavorite(trendId);
+      await addFavoriteAction(trendId);
       setFavorites((prev) => [...prev, trendId]);
     }
   };
